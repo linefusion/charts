@@ -1,0 +1,171 @@
+{{/*
+
+  Gets component configuration by path
+
+*/}}
+
+{{- define "linefusion.component.config" -}}
+  {{- $args := fromYaml (
+    include "linefusion.arguments" (list .
+      (list "path" "context")
+      (dict
+        "context" (dict
+          "Values" (dict
+            "default" (dict)
+            "components" (dict)
+          )
+        )
+      )
+    )
+  ) -}}
+  {{- $path := fromYaml (
+    include "linefusion.path" $args.path
+  ) -}}
+
+  {{- $values := default (dict) $args.context.Values -}}
+  {{- $defaults := default (dict) $values.default -}}
+  {{- $components := default (dict) $values.components -}}
+  {{- $config := dict -}}
+  {{- $configs := list -}}
+  {{- $previous := deepCopy $components -}}
+
+  {{- range $index, $name := $path.value -}}
+    {{- if hasKey $previous $name -}}
+      {{- $config = get $previous $name -}}
+    {{- end -}}
+    {{- $configs = append $configs (dict "name" $name "config" $config ) -}}
+    {{- $previous = ternary $config (dict) (eq (kindOf $config) "map") -}}
+  {{- end -}}
+  {{- $omitted := "$" -}}
+  {{- $config = dict -}}
+  {{- $value := false -}}
+  {{- range $index, $entry := reverse $configs -}}
+    {{- if eq (kindOf $entry.config) "map" -}}
+      {{- $config = merge $config (omit $entry.config $omitted ) -}}
+    {{- else -}}
+      {{- $value = $entry.config -}}
+    {{- end -}}
+    {{- $omitted = $entry.name -}}
+  {{- end -}}
+  {{- $config = merge $config (deepCopy $defaults) -}}
+  {{- toYaml (dict "config" $config "value" $value) }}
+{{- end -}}
+
+{{/*
+
+  Gets component common data by path
+
+*/}}
+
+{{- define "linefusion.component.common" -}}
+  {{- $args := fromYaml (
+    include "linefusion.arguments" (list .
+      (list "root" "component" "instance")
+      (dict
+        "instance" "default"
+      )
+    )
+  ) -}}
+  {{- $labels := (dict
+    "app.kubernetes.io/name"  (
+      $args.root.Chart.name
+    )
+    "app.kubernetes.io/version"     (
+      $args.root.Chart.appVersion
+    )
+    "app.kubernetes.io/managed-by"  (
+      $args.root.Release.Service
+    )
+    "helm.sh.chart" (
+      printf "%s-%s" $args.root.Chart.name $args.root.Chart.version | replace "+" "_" | trunc 63 | trimSuffix "-"
+    )
+  ) -}}
+  {{- $identifier := (dict
+    "component.linefusion.io/id" (
+      printf "%s-%s" $args.component.id $args.instance
+    )
+    "component.linefusion.io/name" (
+      $args.component.name
+    )
+  ) -}}
+  {{- $selector := deepCopy $identifier -}}
+  {{- $this := (dict
+    "metadata" (dict
+      "name"          $args.component.id
+      "labels"        (
+        (merge $labels
+          (merge $identifier
+            (default (dict) $args.component.config.labels)
+          )
+        )
+      )
+      "annotations"   (
+        (default (dict) $args.component.config.annotations)
+      )
+    )
+    "selector"      $selector
+  ) -}}
+  {{- toYaml $this }}
+{{- end -}}
+
+{{/*
+
+  Gets component configuration by path
+
+*/}}
+
+{{- define "linefusion.component" -}}
+  {{- $args := fromYaml (
+    include "linefusion.arguments" (list .
+      (list "root" "name" "instance")
+      (dict
+        "instance" "default"
+      )
+    )
+  ) -}}
+  {{- $path := get ( fromYaml ( include "linefusion.path" $args.name ) ) "value" -}}
+  {{- $this := (dict
+    "id"      ( printf "%s-%s" $args.root.Release.Name ( get ( fromYaml ( include "linefusion.join" ( list $path "-" ) ) ) "value" ) )
+    "name"    ( replace "." "-" $args.name )
+    "config"  (
+      get (
+        fromYaml (
+          include "linefusion.component.config" (list
+            $args.name $args.root
+          )
+        )
+      ) "config"
+    )
+    "parent"  false
+  ) -}}
+
+  {{- if gt (len $path) 1 -}}
+    {{- $_ := set $this "parent" (
+      fromYaml (
+        include "linefusion.component" (
+          list $args.root (
+            get (
+              fromYaml (
+                include "linefusion.join" (
+                  list ( initial $path ) "."
+                )
+              )
+            ) "value"
+          )
+          $args.instance
+        )
+      )
+    ) -}}
+  {{- end -}}
+
+  {{- toYaml
+    (merge
+      (fromYaml
+        (include "linefusion.component.common"
+          (list $args.root $this $args.instance)
+        )
+      )
+      ( $this )
+    )
+  }}
+{{- end -}}

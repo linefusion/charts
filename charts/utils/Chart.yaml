@@ -1,0 +1,6 @@
+apiVersion: v2
+name: utils
+description: Linefusion Helm Utils
+type: library
+version: 0.0.1
+appVersion: "0.0.1"

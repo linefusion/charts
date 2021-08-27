@@ -1,0 +1,193 @@
+{{/*
+Assets a variable matches specific type.
+
+```
+{{- include "linefusion.types.assert" (list $value "string") -}}
+```
+*/}}
+
+{{- define "linefusion.types.assert" -}}
+  {{- $context := . -}}
+  {{- $result := false -}}
+  {{- $value := first $context -}}
+  {{- $parameters := rest $context -}}
+  {{- $types := list -}}
+  {{- if empty $parameters -}}
+    {{- fail "linefusion.types.assert: empty type list" -}}
+  {{- else if gt (len $parameters) 1 -}}
+    {{- $types = $parameters -}}
+  {{- else -}}
+    {{- $types = first $parameters -}}
+  {{- end -}}
+
+  {{- range $type := $types -}}
+    {{- if not $result -}}
+      {{- if kindIs $type $value -}}
+        {{- $result = true -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if not $result -}}
+    {{- fail (cat
+      "linefusion.types.assert: expected [" (toYaml $types) "]. got" (kindOf $value)
+    ) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- define "linefusion.arguments" -}}
+  {{- $context := . -}}
+  {{- if not (or (kindIs "slice" $context) (kindIs "list" $context)) -}}
+    {{- fail "linefusion.arguments: context is not a list" -}}
+  {{- end -}}
+
+  {{- $parameters := deepCopy $context -}}
+  {{- if empty $parameters -}}
+    {{- fail "linefusion.arguments: missing context values" -}}
+  {{- end -}}
+
+  {{- $arguments := first $parameters -}}
+  {{- $parameters = rest $parameters -}}
+
+  {{- if not (or (kindIs "slice" $arguments) (kindIs "list" $arguments)) -}}
+    {{- fail (cat "linefusion.arguments: argument values should be a list. received" (kindOf $arguments)) -}}
+  {{- end -}}
+
+  {{- if empty $parameters -}}
+    {{- fail "linefusion.arguments: missing argument names" -}}
+  {{- end -}}
+
+  {{- $names := first $parameters -}}
+  {{- $parameters = rest $parameters -}}
+
+  {{- $defaults := dict -}}
+  {{- if not ( empty $parameters ) -}}
+    {{- $defaults = first $parameters -}}
+    {{- $parameters = rest $parameters -}}
+  {{- end -}}
+
+  {{- if not ( kindIs "map" $defaults ) -}}
+    {{- fail ( cat "linefusion.arguments: default values should be a map. received" ( kindOf $defaults ) ) -}}
+  {{- end -}}
+
+  {{- $required := 0 -}}
+  {{- range $index, $name := reverse $names -}}
+    {{- if eq $required 0 -}}
+      {{- if not (hasKey $defaults $name) -}}
+        {{- $required = sub (len $names) $index -}}
+      {{- end -}}
+    {{- else -}}
+      {{- if hasKey $defaults $name -}}
+        {{- fail ( cat "linefusion.arguments: missing default value for argument" (index (reverse $names) (sub $index 1)) ) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if lt (len $arguments) $required -}}
+    {{- fail ( cat "linefusion.arguments:" $required "arguments required. received" (len $arguments) ". missing" ) -}}
+  {{- end -}}
+
+  {{- $values := dict -}}
+  {{- range $index, $name := $names -}}
+    {{- if lt $index (len $arguments) -}}
+      {{- $values = set $values $name ( index $arguments $index ) -}}
+    {{- else -}}
+      {{- $values = set $values $name ( get $defaults $name ) -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- toYaml $values }}
+{{- end -}}
+
+{{- define "linefusion.dump" -}}
+  {{- fail ( printf "%s%s%s"
+    "\n\n---------- DUMP ----------\n\n"
+    (toPrettyJson .)
+    "\n\n--------------------------\n\n"
+  ) -}}
+{{- end -}}
+
+{{- define "linefusion.dumpif" -}}
+  {{- $args := fromYaml (
+    include "linefusion.arguments" (list
+      . (list "value" "condition") (dict
+        "condition" true
+      )
+    )
+  ) -}}
+  {{- if $args.condition -}}
+    {{- fail ( printf "%s%s%s"
+      "\n\n---------- DEBUG ----------\n\n"
+      (toPrettyJson $args.value)
+      "\n\n---------------------------\n\n"
+    ) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- define "linefusion.path" -}}
+  {{- $path := . -}}
+  {{- if kindIs "string" $path -}}
+    {{- $path = regexSplit "\\." $path -1 -}}
+  {{- else if kindIs "list" $path -}}
+    {{- range $part := $path -}}
+      {{- if not (kindIs "string" $part) -}}
+        {{- fail ( cat "linefusion.path: path must be a string or a list of strings. found a '" (kindOf $part) "'" ) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{ toYaml (dict "value" $path) }}
+{{- end -}}
+
+{{- define "linefusion.join" -}}
+  {{- $args := fromYaml (
+    include "linefusion.arguments" (list
+      . (list "list" "glue") (dict
+        "list" (list)
+        "glue" " "
+      )
+    )
+  ) -}}
+  {{- $result := "" -}}
+  {{- range $part := $args.list -}}
+    {{- $result = printf "%s%s%s" $result $args.glue $part  -}}
+  {{- end -}}
+  {{- $result = trimPrefix $args.glue $result -}}
+{{ toYaml (dict "value" $result) }}
+{{- end -}}
+
+{{- define "linefusion.value" -}}
+  {{- $args := fromYaml (
+    include "linefusion.arguments" (list
+      . (list "values" "path" "default") (dict
+        "default" (dict)
+      )
+    )
+  ) -}}
+
+  {{- if ne (kindOf $args.values) "map" -}}
+    {{- fail (cat "linefusion.value: $ctx is required to be a dict or map, received " (kindOf $args.values) ) -}}
+  {{- end -}}
+
+  {{- $path := fromYaml ( include "linefusion.path" $args.path ) -}}
+  {{- if empty $path.value -}}
+    {{- fail "linefusion.value: path cant be empty" -}}
+  {{- end -}}
+
+  {{- $source := $args.values -}}
+
+  {{- $break := false -}}
+  {{- range $attribute := $path.value -}}
+    {{- if not $break -}}
+      {{- if hasKey $source $attribute -}}
+        {{- $source = get $source $attribute -}}
+      {{- else -}}
+        {{- $source = $args.default -}}
+        {{- $break = true -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- toYaml (
+    mergeOverwrite (deepCopy $args.default) (deepCopy $source)
+  ) }}
+{{- end -}}

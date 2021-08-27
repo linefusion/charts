@@ -1,0 +1,22 @@
+{{- define "linefusion.resource.registry.template" -}}
+auths:
+  {{ default "index.docker.io" .registry | quote }}:
+    username: {{ .username | quote }}
+    password: {{ .password | quote }}
+    auth: {{ b64enc (printf "%s:%s" .username .password) | quote }}
+{{- end -}}
+
+{{- define "linefusion.resource.registry" -}}
+  {{- $name := index . 0 -}}
+  {{- $registry := index . 1 -}}
+  {{- $json := toJson ( fromYaml ( include "linefusion.resource.registry.template" $registry ) ) -}}
+  {{- if $registry.enabled -}}
+apiVersion: "v1"
+kind: "Secret"
+type: "kubernetes.io/dockerconfigjson"
+metadata:
+  name: {{ $name }}
+data:
+  .dockerconfigjson: {{ b64enc $json | quote }}
+  {{- end -}}
+{{- end -}}
