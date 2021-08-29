@@ -77,7 +77,7 @@ main() {
         done
 
         release_charts
-        update_index $branch
+        update_index
     else
         echo "Nothing to do. No chart changes detected."
     fi
