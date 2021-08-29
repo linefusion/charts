@@ -5,7 +5,7 @@
 ### Releases
 
 ```
-helm repo add linefusion https://linefusion.github.io/charts
+helm repo add linefusion https://charts.linefusion.io
 helm repo update
 ```
 
@@ -15,11 +15,11 @@ helm repo update
 dependencies:
 - name: <chart-name>
   version: "<chart-version>"
-  repository: "https://linefusion.github.io/charts"
+  repository: "https://charts.linefusion.io"
 ```
 
 ## Charts
 
 ### utils
 
-**Highly opinionated** utility librarie to help developing cleaner charts.
+**Highly opinionated** utility libraries to help developing cleaner charts.
