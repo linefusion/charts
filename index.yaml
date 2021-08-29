@@ -3,6 +3,16 @@ entries:
   utils:
   - apiVersion: v2
     appVersion: 0.0.1
+    created: "2021-08-29T22:14:10.790331863Z"
+    description: Linefusion Helm Utils
+    digest: 336c4babc69220fea51c86d00da16713eccb7ad901fec6684e21cfd9aed80fd8
+    name: utils
+    type: library
+    urls:
+    - https://github.com/linefusion/charts/releases/download/utils-0.0.2/utils-0.0.2.tgz
+    version: 0.0.2
+  - apiVersion: v2
+    appVersion: 0.0.1
     created: "2021-08-27T20:01:20.650699521Z"
     description: Linefusion Helm Utils
     digest: c71452a2595c05c7fbc3cd96cf4681807b077b9de82a103ad3babf9adca0181d
@@ -11,4 +21,4 @@ entries:
     urls:
     - https://github.com/linefusion/charts/releases/download/utils-0.0.1/utils-0.0.1.tgz
     version: 0.0.1
-generated: "2021-08-27T20:01:20.650706821Z"
+generated: "2021-08-29T22:14:10.790339063Z"
