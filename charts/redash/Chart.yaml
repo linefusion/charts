@@ -1,0 +1,16 @@
+apiVersion: v2
+name: redash
+description: Redash application
+version: 0.0.1
+appVersion: 10.0.0.b50363
+engine: gotpl
+
+dependencies:
+  - name: redis
+    version: "^10.8.2"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+  - name: postgresql
+    version: "^8.10.14"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
