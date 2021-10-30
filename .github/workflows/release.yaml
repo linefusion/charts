@@ -22,6 +22,12 @@ jobs:
         with:
           version: v3.4.0
 
+      - name: Install Dependencies
+        run: |
+          for chart in $(ls charts); do
+            helm dependency update charts/${chart}
+          done
+
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.2.1
         env:
